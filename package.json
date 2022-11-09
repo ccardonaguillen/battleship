@@ -1,0 +1,30 @@
+{
+  "name": "battleship",
+  "version": "1.0.0",
+  "description": "Web-based implementation of the Battleship boardgame to practice TDD",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ccardonaguillen/battleship.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ccardonaguillen/battleship/issues"
+  },
+  "homepage": "https://github.com/ccardonaguillen/battleship#readme",
+  "dependencies": {
+    "jquery": "^3.6.1"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.20.2",
+    "jest": "^29.3.1",
+    "webpack": "^5.74.0",
+    "webpack-cli": "^4.10.0",
+    "webpack-dev-server": "^4.11.1"
+  }
+}
