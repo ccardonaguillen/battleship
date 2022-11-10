@@ -24,8 +24,18 @@ const ship = (shipClass) => {
         return hp === 0 ? true : false;
     }
 
+    function getLength() {
+        return length;
+    }
+
+    function getClass() {
+        return shipClass;
+    }
+
     return {
         getHP,
+        getLength,
+        getClass,
         isSunk,
         hit,
     };
