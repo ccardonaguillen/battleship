@@ -1,0 +1,139 @@
+:root {
+    font-size: 62.5%;
+    --board-width: min(25vw, 400px);
+    --ships-width: min(8vw, 200px);
+}
+
+body {
+    margin: 0;
+    width: 100vw;
+    max-height: 100vh;
+}
+
+
+
+header>h1 {
+    text-align: center;
+    margin: 0;
+    font-size: 7rem;
+    margin-top: 3rem;
+    margin-bottom: 4rem;
+}
+
+main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#new-game-button {
+    appearance: none;
+    margin-top: 3rem;
+    padding: 0.5rem 1.5rem;
+    border-radius: 5px;
+    font-size: 1.5rem;
+    font-weight: bold;
+
+}
+
+#info-box {
+    border: 1px solid black;
+    width: min(60vw, 600px);
+    padding: 0.8rem;
+    font-size: 1.8rem;
+    text-align: center;
+
+}
+
+#gameboard {
+    height: var(--board-width);
+    display: grid;
+    grid-auto-flow: column;
+    margin-top: 2rem;
+    gap: 5rem
+}
+
+#player1 {
+    display: grid;
+    grid-template: var(--board-width) auto / var(--ships-width) var(--board-width);
+    grid-template-areas:
+        "ships board"
+        "ships name";
+}
+
+#player2 {
+    display: grid;
+    grid-template: var(--board-width) auto / var(--board-width) var(--ships-width);
+    grid-template-areas:
+        "board ships"
+        "name ships";
+}
+
+/* Ships display container */
+.ships {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 0.8rem;
+}
+
+.ships>div>div {
+    background-color: grey;
+    width: min(0.8vw, 10px);
+    height: min(0.8vw, 10px);
+}
+
+.name {
+    grid-area: name;
+    margin: 0;
+    text-align: center;
+    font-size: 1.6rem;
+    font-weight: bold;
+}
+
+table {
+    width: 100%;
+    height: 100%;
+    border-spacing: 1px;
+}
+
+table td {
+    border: 2px solid black;
+    width: 2.5vw;
+}
+
+table td:hover {
+    background-color: lightgrey;
+}
+
+.row-header,
+.column-header,
+.corner-cell {
+    margin: 0;
+    padding: 0;
+    border: none;
+    font-size: 1.4rem;
+}
+
+.row-header:hover,
+.column-header:hover,
+.corner-cell:hover {
+    background-color: #00000000;
+}
+
+
+.row-header.align-right {
+    text-align: right;
+    padding-right: 0.3vw;
+    width: 0px;
+}
+
+.row-header.align-left {
+    padding-left: 0.3vw;
+    width: 0px;
+}
+
+.column-header {
+    text-align: center;
+    vertical-align: top;
+}
