@@ -32,38 +32,48 @@ const gameboard = (player, size = 10) => {
         return tiles.map((row) => row.map((tile) => tile.getContents()));
     }
 
-    function placeShip(row, column, shipClass, rotate = true) {
-        // Check if ship starting position is outside of board limits
-        if (row > nrows - 1 || column > ncolumns - 1)
-            throw new Error('Cannot place ship outside board limits');
-
+    function checkNewShipTargetTiles(row, column, ship, rotate) {
         // Create new ship and assign target tiles to place it
-        const newShip = ship(shipClass);
         const targetTiles = [];
+
         if (rotate) {
             // Select tiles along rows starting at selected tile
-            for (let i = row; i < row + newShip.getLength(); i++) {
+            for (let i = row; i < row + ship.getLength(); i++) {
                 targetTiles.push(tiles[i][column]);
             }
         } else {
             // Select tiles along columns starting at selected tile
-            for (let j = column; j < column + newShip.getLength(); j++) {
+            for (let j = column; j < column + ship.getLength(); j++) {
                 targetTiles.push(tiles[row][j]);
             }
         }
 
         // Check if one of the target tiles is outside of board limits (undefined)
         if (targetTiles.some((tile) => tile === undefined))
-            throw new Error('Ship cannot go out of bounds');
+            return { valid: false, status: 'outOfBounds' };
 
-        // Check if any of the target tiles is occupied
-        try {
-            targetTiles.map((tile) => tile.placeShip(newShip));
-        } catch (error) {
+        if (!targetTiles.some((tile) => tile.isAvailable()))
+            return { valid: false, status: 'inUse' };
+
+        return { valid: true, target: targetTiles };
+    }
+
+    function placeShip(row, column, shipClass, rotate = true) {
+        // Check if ship starting position is outside of board limits
+        if (row > nrows - 1 || column > ncolumns - 1)
+            throw new Error('Cannot place ship outside board limits');
+
+        const newShip = ship(shipClass);
+        const checkAvail = checkNewShipTargetTiles(row, column, newShip, rotate);
+
+        if (checkAvail.valid) {
+            checkAvail.target.map((tile) => tile.placeShip(newShip));
+            return newShip;
+        } else if (checkAvail.status === 'outOfBounds') {
+            throw new Error('Ship cannot go out of bounds');
+        } else if (checkAvail.status === 'inUse') {
             throw new Error('One or more tiles are already occupied');
         }
-
-        return newShip;
     }
 
     function receiveAttack({ player: target, row, column }) {
