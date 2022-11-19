@@ -4,7 +4,10 @@
   "description": "Web-based implementation of the Battleship boardgame to practice TDD",
   "main": "index.js",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "watch": "webpack --watch",
+    "build": "webpack",
+    "start": "webpack server --open"
   },
   "repository": {
     "type": "git",

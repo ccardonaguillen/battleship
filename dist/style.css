@@ -103,7 +103,8 @@ table td {
 }
 
 table td:hover {
-    background-color: lightgrey;
+    border: 2px solid rgb(130, 130, 130);
+    background-color: rgb(240, 240, 240);
 }
 
 .row-header,
@@ -118,6 +119,7 @@ table td:hover {
 .row-header:hover,
 .column-header:hover,
 .corner-cell:hover {
+    border: none;
     background-color: #00000000;
 }
 

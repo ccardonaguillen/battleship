@@ -1,4 +1,4 @@
-const shipHP = {
+const shipList = {
     carrier: 5,
     battleship: 4,
     destroyer: 3,
@@ -7,7 +7,7 @@ const shipHP = {
 };
 
 const ship = (shipClass) => {
-    const length = shipHP[shipClass];
+    const length = shipList[shipClass];
     let hp = length;
 
     function hit() {
