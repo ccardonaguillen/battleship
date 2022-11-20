@@ -1,3 +1,3 @@
-const player = (num, name) => {};
+const player = (num) => {};
 
 export default player;

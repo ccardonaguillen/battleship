@@ -14,8 +14,6 @@ const gameboard = (player, size = 10) => {
     const ncolumns = size;
     let tiles = [];
 
-    events.on('tileSelected', receiveAttack);
-
     for (let i = 0; i < nrows; i++) {
         let temp = [];
         for (let j = 0; j < ncolumns; j++) {
@@ -32,47 +30,50 @@ const gameboard = (player, size = 10) => {
         return tiles.map((row) => row.map((tile) => tile.getContents()));
     }
 
-    function checkNewShipTargetTiles(row, column, ship, rotate) {
+    function checkPlacement(row, column, ship, rotate) {
         // Create new ship and assign target tiles to place it
         const targetTiles = [];
+        const shipLength = ship.getLength();
+
+        // Check if one of the target tiles is outside of board limits
+        if ((rotate && row + shipLength > size) || (!rotate && column + shipLength > size))
+            return { valid: false, status: 'outOfBounds' };
 
         if (rotate) {
             // Select tiles along rows starting at selected tile
-            for (let i = row; i < row + ship.getLength(); i++) {
+            for (let i = row; i < row + shipLength; i++) {
                 targetTiles.push(tiles[i][column]);
             }
         } else {
             // Select tiles along columns starting at selected tile
-            for (let j = column; j < column + ship.getLength(); j++) {
+            for (let j = column; j < column + shipLength; j++) {
                 targetTiles.push(tiles[row][j]);
             }
         }
 
-        // Check if one of the target tiles is outside of board limits (undefined)
-        if (targetTiles.some((tile) => tile === undefined))
-            return { valid: false, status: 'outOfBounds' };
-
-        if (!targetTiles.some((tile) => tile.isAvailable()))
+        if (!targetTiles.every((tile) => tile.isAvailable()))
             return { valid: false, status: 'inUse' };
 
         return { valid: true, target: targetTiles };
     }
 
-    function placeShip(row, column, shipClass, rotate = true) {
+    function placeShip(row, column, shipClass, rotate = false) {
         // Check if ship starting position is outside of board limits
         if (row > nrows - 1 || column > ncolumns - 1)
             throw new Error('Cannot place ship outside board limits');
 
         const newShip = ship(shipClass);
-        const checkAvail = checkNewShipTargetTiles(row, column, newShip, rotate);
+        const checkAvail = checkPlacement(row, column, newShip, rotate);
 
         if (checkAvail.valid) {
             checkAvail.target.map((tile) => tile.placeShip(newShip));
             return newShip;
-        } else if (checkAvail.status === 'outOfBounds') {
-            throw new Error('Ship cannot go out of bounds');
-        } else if (checkAvail.status === 'inUse') {
-            throw new Error('One or more tiles are already occupied');
+        } else {
+            if (checkAvail.status === 'outOfBounds') {
+                throw new Error('Ship cannot go out of bounds');
+            } else if (checkAvail.status === 'inUse') {
+                throw new Error('One or more tiles are already occupied');
+            }
         }
     }
 
@@ -89,61 +90,39 @@ const gameboard = (player, size = 10) => {
     return {
         getTiles,
         getTileContents,
+        checkNewShipTargetTiles: checkPlacement,
         placeShip,
         receiveAttack,
     };
 };
 
-const gameboardView = (player) => {
+const gameboardView = (player, gameboard) => {
     const isPlayer1 = player === 'player1' ? true : false;
-    const board = document.getElementById(`${player}-board`);
-    const shipsContainer = document.getElementById(`${player}-ships`);
     const shipsDisplay = {};
 
     let tiles = [];
 
-    _createBoard(board, 10);
-    _createShipsDisplay(shipsContainer);
+    let previewCoords = null;
+    let renderPreviewHandlers = [];
+    let clearPreviewHandlers = [];
 
-    tiles.forEach((row) => {
-        row.forEach((tile) => {
-            tile.addEventListener('click', () => {
-                events.emit('tileSelected', {
-                    player,
-                    row: tile.getAttribute('data-row'),
-                    column: tile.getAttribute('data-column'),
-                });
-            });
-        });
-    });
+    _initView();
 
     events.on('shipPlaced', _renderNewShip);
+    events.on('shipPlaced', clearPreview);
     events.on('attackHit', _renderAttack);
     events.on('attackMissed', _renderMiss);
 
-    function _renderNewShip({ player: owner, row, column }) {
-        if (owner === player && player != 'player2') {
-            tiles[row][column].style.backgroundColor = 'black';
-        }
+    function getPlayerTiles() {
+        return { player, tiles };
     }
 
-    function _renderAttack({ player: target, row, column, ship }) {
-        if (target === player) {
-            tiles[row][column].style.backgroundColor = 'red';
+    function _initView() {
+        const board = document.getElementById(`${player}-board`);
+        const shipsContainer = document.getElementById(`${player}-ships`);
 
-            const shipClass = ship.getClass();
-            const shipHP = ship.getHP();
-
-            const index = player === 'player1' ? shipHP : shipList[shipClass] - shipHP - 1;
-            const hpDiv = shipsDisplay[shipClass][index];
-            hpDiv.style.backgroundColor = 'red';
-        }
-    }
-
-    function _renderMiss({ player: target, row, column }) {
-        if (target === player) {
-            tiles[row][column].style.backgroundColor = 'blue';
-        }
+        _createBoard(board, 10);
+        _createShipsDisplay(shipsContainer);
     }
 
     function _createBoard(board, size) {
@@ -179,6 +158,11 @@ const gameboardView = (player) => {
 
                     cell.setAttribute('data-row', i);
                     cell.setAttribute('data-column', dataColumn);
+
+                    cell.addEventListener('click', () => {
+                        events.emit('tileSelected', { player, row: i, column: dataColumn });
+                    });
+
                     tempArr.push(cell);
                 }
             }
@@ -210,6 +194,120 @@ const gameboardView = (player) => {
             display.appendChild(container);
         }
     }
+
+    function _renderNewShip({ player: owner, row, column }) {
+        if (owner === player && player != 'player2') {
+            tiles[row][column].classList.add('ship');
+            removePreviewListeners();
+        }
+    }
+
+    function _renderAttack({ player: target, row, column, ship }) {
+        if (target === player) {
+            tiles[row][column].style.backgroundColor = 'red';
+
+            const shipClass = ship.getClass();
+            const shipHP = ship.getHP();
+
+            const index = player === 'player1' ? shipHP : shipList[shipClass] - shipHP - 1;
+            const hpDiv = shipsDisplay[shipClass][index];
+            hpDiv.style.backgroundColor = 'red';
+        }
+    }
+
+    function _renderMiss({ player: target, row, column }) {
+        if (target === player) {
+            tiles[row][column].style.backgroundColor = 'blue';
+        }
+    }
+
+    function previewShipPlacement(shipClass) {
+        const newShip = ship(shipClass);
+        let rotate = false;
+
+        tiles.forEach((row, i) => {
+            let tempArr = [];
+            row.forEach((tile, j) => {
+                const wrapper = (e) => {
+                    previewCoords = renderPreview(i, j, newShip, rotate);
+                };
+                tile.addEventListener('mouseover', wrapper);
+                tempArr.push(wrapper);
+            });
+            renderPreviewHandlers.push(tempArr);
+        });
+
+        tiles.forEach((row, i) => {
+            let tempArr = [];
+            row.forEach((tile, j) => {
+                const wrapper = (e) => {
+                    if (previewCoords !== null) previewCoords.forEach(clearPreview);
+                };
+                tile.addEventListener('mouseout', wrapper);
+                tempArr.push(wrapper);
+            });
+            clearPreviewHandlers.push(tempArr);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            rotate = rotatePreview(e, rotate);
+        });
+    }
+
+    function renderPreview(row, column, ship, rotate) {
+        const checkTiles = gameboard.checkNewShipTargetTiles(row, column, ship, rotate);
+
+        if (checkTiles.valid) {
+            const targetTilesCoords = checkTiles.target.map((tile) => tile.getCoords());
+
+            targetTilesCoords.forEach(({ row, column }) => {
+                tiles[row][column].classList.add('preview');
+            });
+
+            return targetTilesCoords;
+        } else {
+            return null;
+        }
+    }
+
+    function clearPreview({ row, column }) {
+        tiles[row][column].classList.remove('preview');
+    }
+
+    function rotatePreview(e, rotate) {
+        if (e.key === 'Control') {
+            events.emit('previewRotated', !rotate);
+            return !rotate;
+        }
+    }
+
+    function removePreviewListeners() {
+        if (previewCoords !== null) previewCoords.forEach(clearPreview);
+
+        if (renderPreviewHandlers.length !== 0) {
+            tiles.forEach((row, i) => {
+                row.forEach((tile, j) => {
+                    tile.removeEventListener('mouseover', renderPreviewHandlers[i][j]);
+                });
+            });
+        }
+
+        if (clearPreviewHandlers.length !== 0) {
+            tiles.forEach((row, i) => {
+                row.forEach((tile, j) => {
+                    tile.removeEventListener('mouseout', clearPreviewHandlers[i][j]);
+                });
+            });
+        }
+
+        renderPreviewHandlers = [];
+        clearPreviewHandlers = [];
+    }
+
+    return {
+        previewShipPlacement,
+        getPlayerTiles,
+    };
 };
 
 const tile = (player, row, column) => {
@@ -219,6 +317,10 @@ const tile = (player, row, column) => {
     events.on('tileSelected', (coords) => {
         // if (coords.row == row && coords.column == column) console.log(row, column);
     });
+
+    function getCoords() {
+        return { row, column };
+    }
 
     function getContents() {
         return ship;
@@ -254,6 +356,7 @@ const tile = (player, row, column) => {
     }
 
     return {
+        getCoords,
         getContents,
         placeShip,
         target,

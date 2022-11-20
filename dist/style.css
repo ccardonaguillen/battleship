@@ -107,6 +107,14 @@ table td:hover {
     background-color: rgb(240, 240, 240);
 }
 
+table td.ship {
+    background-color: black;
+}
+
+table td.preview {
+    background-color: green;
+}
+
 .row-header,
 .column-header,
 .corner-cell {
