@@ -1,5 +1,5 @@
-import gameboard, { gameboardView, tile } from './gameboard';
-// import player from './player';
+import gameboard, { gameboardView } from './gameboard';
+import player from './player';
 import events from './events';
 import ship from './ship';
 
@@ -14,18 +14,11 @@ const shipList = {
 const game = (function () {
     const infoBox = document.getElementById('info-box');
 
-    const players = ['player1', 'player2'];
-    const playerGameboards = players.map((player) => gameboard(player));
-    const playerGameboardView = players.map((playerName, i) =>
-        gameboardView(playerName, playerGameboards[i])
-    );
-    const remainingShips = players.map((player) => Object.keys(shipList));
+    const players = { player: player(1), computer: player(2) };
 
     events.on('attackHit', _announceHit);
     events.on('attackMissed', _announceMiss);
     events.on('shipSunk', _announceSinking);
-
-    const player1Tiles = playerGameboardView[0].getPlayerTiles().tiles;
 
     startGame();
 
@@ -35,7 +28,7 @@ const game = (function () {
     }
 
     async function prepareBoard() {
-        placeShipsRandomly(playerGameboards[1]);
+        placeShipsRandomly(players.computer.getBoard());
         await displayWelcomeMessage();
     }
 
@@ -50,7 +43,7 @@ const game = (function () {
 
             const randomButton = document.getElementById('random-button');
             randomButton.addEventListener('click', () => {
-                placeShipsRandomly(playerGameboards[0]).then(() => resolve());
+                placeShipsRandomly(players.player.getBoard()).then(() => resolve());
             });
         });
     }
@@ -66,11 +59,11 @@ const game = (function () {
 
         function placeShip(ship) {
             const row = Math.floor(Math.random() * 10);
-            const column = Math.floor(Math.random() * 10);
+            const col = Math.floor(Math.random() * 10);
             const rotate = Math.random() < 0.5;
 
             try {
-                gameboard.placeShip(row, column, ship, rotate);
+                gameboard.placeShip(row, col, ship, rotate);
             } catch (error) {
                 placeShip(ship);
             }
@@ -84,7 +77,7 @@ const game = (function () {
     }
 
     function placeShipsManually() {
-        const gameboard = playerGameboards[0];
+        const gameboard = players.player.getBoard();
         let rotate = false;
 
         events.on('previewRotated', (rotation) => {
@@ -92,13 +85,13 @@ const game = (function () {
         });
 
         function placeShip(ship) {
-            playerGameboardView[0].previewShipPlacement(ship);
+            players.player.getBoardView().previewShipPlacement(ship);
 
             return new Promise((resolve, reject) => {
-                const handler = function ({ player, row, column }) {
-                    if (player === 'player1') {
+                const handler = function ({ owner, row, col }) {
+                    if (owner === 'player') {
                         try {
-                            gameboard.placeShip(row, column, ship, rotate);
+                            gameboard.placeShip(row, col, ship, rotate);
 
                             events.off('tileSelected', handler);
                             rotate = false;
@@ -131,70 +124,38 @@ const game = (function () {
         infoBox.textContent = 'Select an enemy position to attack';
 
         events.on('shipSunk', ({ player, ship }) => {
-            if (player === 'player1') {
-                remainingShips[0] = remainingShips[0].filter(
-                    (shipClass) => ship.getClass() !== shipClass
-                );
+            if (player === 'player') {
+                players.player.destroyShip(ship);
             } else {
-                remainingShips[1] = remainingShips[1].filter(
-                    (shipClass) => ship.getClass() !== shipClass
-                );
+                players.computer.destroyShip(ship);
             }
         });
 
-        while (remainingShips.every((ship) => ship.length !== 0)) {
-            await attackComputer();
+        while (Object.values(players).every((player) => player.getRemainingShips() !== 0)) {
+            await players.player
+                .playerAttack(players.computer)
+                .catch((message) => (infoBox.textContent = message));
             await new Promise((resolve) =>
                 setTimeout(() => {
-                    attackPlayer();
-                    resolve();
+                    players.computer.computerAttack(players.player).then(() => resolve());
                 }, 1000)
             );
         }
 
-        const winner = remainingShips[1].length === 0 ? 'player' : 'computer';
-        const loser = remainingShips[1].length === 0 ? 'computer' : 'player';
+        const winner = players.computer.getRemainingShips() === 0 ? 'player' : 'computer';
+        const loser = players.computer.getRemainingShips() === 0 ? 'computer' : 'player';
 
         infoBox.innerHTML = `The <strong>${winner}</strong> wins. All ${loser}'s ships have been destroyed`;
         infoBox.innerHTML += "<br>Click the 'New Game' button to start over";
     }
 
-    function attackComputer() {
-        return new Promise((resolve) => {
-            const attackHandler = ({ player, row, column }) => {
-                try {
-                    playerGameboards[1].receiveAttack({ player, row, column });
-                    events.off('tileSelected', attackHandler);
-
-                    resolve();
-                } catch {
-                    infoBox.textContent =
-                        'This tile has already been attacked. Select a new position';
-                }
-            };
-
-            events.on('tileSelected', attackHandler);
-        });
-    }
-
-    function attackPlayer() {
-        const row = Math.floor(Math.random() * 10);
-        const column = Math.floor(Math.random() * 10);
-
-        try {
-            playerGameboards[0].receiveAttack({ player: 'player1', row, column });
-        } catch {
-            attackPlayer();
-        }
-    }
-
-    function _announceHit({ player: target, ship }) {
+    function _announceHit({ target, ship }) {
         infoBox.textContent = `${target}'s ${ship.getClass()} has been damaged`;
     }
     function _announceMiss() {
         infoBox.textContent = 'Shot missed, landed in water';
     }
-    function _announceSinking({ player: target, ship }) {
+    function _announceSinking({ target, ship }) {
         infoBox.textContent = `${target}'s ${ship.getClass()} has been sunk`;
     }
 })();

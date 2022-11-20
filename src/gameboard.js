@@ -9,7 +9,7 @@ const shipList = {
     patrol: 2,
 };
 
-const gameboard = (player, size = 10) => {
+const gameboard = (owner, size = 10) => {
     const nrows = size;
     const ncolumns = size;
     let tiles = [];
@@ -17,7 +17,7 @@ const gameboard = (player, size = 10) => {
     for (let i = 0; i < nrows; i++) {
         let temp = [];
         for (let j = 0; j < ncolumns; j++) {
-            temp.push(tile(player, i, j));
+            temp.push(tile(owner, i, j));
         }
         tiles.push(temp);
     }
@@ -30,23 +30,23 @@ const gameboard = (player, size = 10) => {
         return tiles.map((row) => row.map((tile) => tile.getContents()));
     }
 
-    function checkPlacement(row, column, ship, rotate) {
+    function checkPlacement(row, col, ship, rotate) {
         // Create new ship and assign target tiles to place it
         const targetTiles = [];
         const shipLength = ship.getLength();
 
         // Check if one of the target tiles is outside of board limits
-        if ((rotate && row + shipLength > size) || (!rotate && column + shipLength > size))
+        if ((rotate && row + shipLength > size) || (!rotate && col + shipLength > size))
             return { valid: false, status: 'outOfBounds' };
 
         if (rotate) {
             // Select tiles along rows starting at selected tile
             for (let i = row; i < row + shipLength; i++) {
-                targetTiles.push(tiles[i][column]);
+                targetTiles.push(tiles[i][col]);
             }
         } else {
             // Select tiles along columns starting at selected tile
-            for (let j = column; j < column + shipLength; j++) {
+            for (let j = col; j < col + shipLength; j++) {
                 targetTiles.push(tiles[row][j]);
             }
         }
@@ -57,13 +57,13 @@ const gameboard = (player, size = 10) => {
         return { valid: true, target: targetTiles };
     }
 
-    function placeShip(row, column, shipClass, rotate = false) {
+    function placeShip(row, col, shipClass, rotate = false) {
         // Check if ship starting position is outside of board limits
-        if (row > nrows - 1 || column > ncolumns - 1)
+        if (row > nrows - 1 || col > ncolumns - 1)
             throw new Error('Cannot place ship outside board limits');
 
         const newShip = ship(shipClass);
-        const checkAvail = checkPlacement(row, column, newShip, rotate);
+        const checkAvail = checkPlacement(row, col, newShip, rotate);
 
         if (checkAvail.valid) {
             checkAvail.target.map((tile) => tile.placeShip(newShip));
@@ -77,11 +77,11 @@ const gameboard = (player, size = 10) => {
         }
     }
 
-    function receiveAttack({ player: target, row, column }) {
-        if (player != target) return;
+    function receiveAttack({ target, row, col }) {
+        if (owner != target) return;
 
         try {
-            tiles[row][column].target();
+            tiles[row][col].target();
         } catch (error) {
             throw error;
         }
@@ -90,14 +90,14 @@ const gameboard = (player, size = 10) => {
     return {
         getTiles,
         getTileContents,
-        checkNewShipTargetTiles: checkPlacement,
+        checkPlacement,
         placeShip,
         receiveAttack,
     };
 };
 
-const gameboardView = (player, gameboard) => {
-    const isPlayer1 = player === 'player1' ? true : false;
+const gameboardView = (owner, gameboard) => {
+    const isPlayer1 = owner === 'player' ? true : false;
     const shipsDisplay = {};
 
     let tiles = [];
@@ -114,12 +114,12 @@ const gameboardView = (player, gameboard) => {
     events.on('attackMissed', _renderMiss);
 
     function getPlayerTiles() {
-        return { player, tiles };
+        return { player: owner, tiles };
     }
 
     function _initView() {
-        const board = document.getElementById(`${player}-board`);
-        const shipsContainer = document.getElementById(`${player}-ships`);
+        const board = document.getElementById(`${owner}-board`);
+        const shipsContainer = document.getElementById(`${owner}-ships`);
 
         _createBoard(board, 10);
         _createShipsDisplay(shipsContainer);
@@ -160,7 +160,7 @@ const gameboardView = (player, gameboard) => {
                     cell.setAttribute('data-column', dataColumn);
 
                     cell.addEventListener('click', () => {
-                        events.emit('tileSelected', { player, row: i, column: dataColumn });
+                        events.emit('tileSelected', { owner, row: i, col: dataColumn });
                     });
 
                     tempArr.push(cell);
@@ -195,29 +195,29 @@ const gameboardView = (player, gameboard) => {
         }
     }
 
-    function _renderNewShip({ player: owner, row, column }) {
-        if (owner === player && player != 'player2') {
-            tiles[row][column].classList.add('ship');
+    function _renderNewShip({ player, row, col }) {
+        if (player === owner && owner != 'computer') {
+            tiles[row][col].classList.add('ship');
             removePreviewListeners();
         }
     }
 
-    function _renderAttack({ player: target, row, column, ship }) {
-        if (target === player) {
-            tiles[row][column].style.backgroundColor = 'red';
+    function _renderAttack({ target, row, col, ship }) {
+        if (target === owner) {
+            tiles[row][col].style.backgroundColor = 'red';
 
             const shipClass = ship.getClass();
             const shipHP = ship.getHP();
 
-            const index = player === 'player1' ? shipHP : shipList[shipClass] - shipHP - 1;
+            const index = owner === 'player' ? shipHP : shipList[shipClass] - shipHP - 1;
             const hpDiv = shipsDisplay[shipClass][index];
             hpDiv.style.backgroundColor = 'red';
         }
     }
 
-    function _renderMiss({ player: target, row, column }) {
-        if (target === player) {
-            tiles[row][column].style.backgroundColor = 'blue';
+    function _renderMiss({ target, row, col }) {
+        if (target === owner) {
+            tiles[row][col].style.backgroundColor = 'blue';
         }
     }
 
@@ -254,14 +254,14 @@ const gameboardView = (player, gameboard) => {
         });
     }
 
-    function renderPreview(row, column, ship, rotate) {
-        const checkTiles = gameboard.checkNewShipTargetTiles(row, column, ship, rotate);
+    function renderPreview(row, col, ship, rotate) {
+        const checkTiles = gameboard.checkPlacement(row, col, ship, rotate);
 
         if (checkTiles.valid) {
             const targetTilesCoords = checkTiles.target.map((tile) => tile.getCoords());
 
-            targetTilesCoords.forEach(({ row, column }) => {
-                tiles[row][column].classList.add('preview');
+            targetTilesCoords.forEach(({ row, col }) => {
+                tiles[row][col].classList.add('preview');
             });
 
             return targetTilesCoords;
@@ -270,8 +270,8 @@ const gameboardView = (player, gameboard) => {
         }
     }
 
-    function clearPreview({ row, column }) {
-        tiles[row][column].classList.remove('preview');
+    function clearPreview({ row, col }) {
+        tiles[row][col].classList.remove('preview');
     }
 
     function rotatePreview(e, rotate) {
@@ -310,16 +310,12 @@ const gameboardView = (player, gameboard) => {
     };
 };
 
-const tile = (player, row, column) => {
+const tile = (owner, row, col) => {
     let ship = null;
     let hit = false;
 
-    events.on('tileSelected', (coords) => {
-        // if (coords.row == row && coords.column == column) console.log(row, column);
-    });
-
     function getCoords() {
-        return { row, column };
+        return { row, col };
     }
 
     function getContents() {
@@ -330,7 +326,7 @@ const tile = (player, row, column) => {
         // Place ship in tile if it is available
         if (isAvailable()) {
             ship = newShip;
-            events.emit('shipPlaced', { player, row, column });
+            events.emit('shipPlaced', { player: owner, row, col });
         } else {
             throw new Error('You cannot place a ship here');
         }
@@ -341,11 +337,11 @@ const tile = (player, row, column) => {
 
         if (ship !== null) {
             ship.hit();
-            events.emit('attackHit', { player, row, column, ship });
+            events.emit('attackHit', { target: owner, row, col, ship });
 
-            if (ship.getHP() === 0) events.emit('shipSunk', { player, ship });
+            if (ship.getHP() === 0) events.emit('shipSunk', { target: owner, ship });
         } else {
-            events.emit('attackMissed', { player, row, column });
+            events.emit('attackMissed', { target: owner, row, col });
         }
         hit = true;
     }
