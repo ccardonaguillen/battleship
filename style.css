@@ -53,7 +53,7 @@ main {
     gap: 5rem
 }
 
-#player1 {
+#player {
     display: grid;
     grid-template: var(--board-width) auto / var(--ships-width) var(--board-width);
     grid-template-areas:
@@ -61,7 +61,7 @@ main {
         "ships name";
 }
 
-#player2 {
+#computer {
     display: grid;
     grid-template: var(--board-width) auto / var(--board-width) var(--ships-width);
     grid-template-areas:
