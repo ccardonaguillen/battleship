@@ -15,7 +15,9 @@ body {
 header>h1 {
     text-align: center;
     margin: 0;
-    font-size: 7rem;
+    font-size: 8rem;
+    font-family: 'Oswald', sans-serif;
+    letter-spacing: 0.5rem;
     margin-top: 3rem;
     margin-bottom: 4rem;
 }
@@ -24,6 +26,15 @@ main {
     display: flex;
     flex-direction: column;
     align-items: center;
+}
+
+#manual-button,
+#random-button {
+    appearance: none;
+    border-radius: 3px;
+    border: 1px solid black;
+    font-size: 1.6rem;
+    font-family: "Liberation Serif";
 }
 
 #new-game-button {
