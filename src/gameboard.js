@@ -15,11 +15,10 @@ const gameboard = (owner, size = 10) => {
     let tiles = [];
 
     for (let i = 0; i < nrows; i++) {
-        let temp = [];
+        tiles[i] = [];
         for (let j = 0; j < ncolumns; j++) {
-            temp.push(tile(owner, i, j));
+            tiles[i][j] = tile(owner, i, j);
         }
-        tiles.push(temp);
     }
 
     function getTiles() {
@@ -34,21 +33,15 @@ const gameboard = (owner, size = 10) => {
         // Create new ship and assign target tiles to place it
         const targetTiles = [];
         const shipLength = ship.getLength();
+        const axis = rotate ? row : col; // Axis along which check placement (row or cols)
+        const endIdx = axis + shipLength;
 
         // Check if one of the target tiles is outside of board limits
-        if ((rotate && row + shipLength > size) || (!rotate && col + shipLength > size))
-            return { valid: false, status: 'outOfBounds' };
+        if (endIdx > size) return { valid: false, status: 'outOfBounds' };
 
-        if (rotate) {
-            // Select tiles along rows starting at selected tile
-            for (let i = row; i < row + shipLength; i++) {
-                targetTiles.push(tiles[i][col]);
-            }
-        } else {
-            // Select tiles along columns starting at selected tile
-            for (let j = col; j < col + shipLength; j++) {
-                targetTiles.push(tiles[row][j]);
-            }
+        // Select tiles along rows or columns starting at selected tile
+        for (let idx = axis; idx < endIdx; idx++) {
+            targetTiles.push(rotate ? tiles[idx][col] : tiles[row][idx]);
         }
 
         if (!targetTiles.every((tile) => tile.isAvailable()))
@@ -78,8 +71,6 @@ const gameboard = (owner, size = 10) => {
     }
 
     function receiveAttack({ target, row, col }) {
-        if (owner != target) return;
-
         try {
             tiles[row][col].target();
         } catch (error) {
@@ -97,7 +88,7 @@ const gameboard = (owner, size = 10) => {
 };
 
 const gameboardView = (owner, gameboard) => {
-    const isPlayer1 = owner === 'player' ? true : false;
+    const isPlayer = owner === 'player' ? true : false;
     const shipsDisplay = {};
 
     let tiles = [];
@@ -109,13 +100,10 @@ const gameboardView = (owner, gameboard) => {
     _initView();
 
     events.on('shipPlaced', _renderNewShip);
-    events.on('shipPlaced', clearPreview);
+    events.on('shipPlaced', _clearPreview);
     events.on('attackHit', _renderAttack);
     events.on('attackMissed', _renderMiss);
-
-    function getPlayerTiles() {
-        return { player: owner, tiles };
-    }
+    events.on('enablePreview', _previewPlacement);
 
     function _initView() {
         const board = document.getElementById(`${owner}-board`);
@@ -127,46 +115,36 @@ const gameboardView = (owner, gameboard) => {
 
     function _createBoard(board, size) {
         const table = document.createElement('table');
-        const ncolumns = size;
+        const ncols = size;
+
+        const colHeader = isPlayer ? 0 : ncols;
 
         for (let i = 0; i <= size; i++) {
-            let tempArr = [];
+            if (i !== size) tiles[i] = [];
             const row = table.insertRow();
-            for (let j = 0; j <= ncolumns; j++) {
+            for (let j = 0; j <= ncols; j++) {
+                const colIdx = isPlayer ? j - 1 : j;
                 const cell = row.insertCell();
 
-                if (
-                    (isPlayer1 && i === size && j === 0) ||
-                    (!isPlayer1 && i === size && j === ncolumns)
-                ) {
+                if (i === size && j === colHeader) {
                     cell.classList.add('corner-cell');
-                    continue;
-                } else if ((isPlayer1 && j === 0) || (!isPlayer1 && j === ncolumns)) {
+                } else if (j === colHeader) {
                     cell.textContent = i + 1;
-                    cell.classList.add('row-header');
-                    if (isPlayer1) {
-                        cell.classList.add('align-right');
-                    } else {
-                        cell.classList.add('align-left');
-                    }
+                    cell.classList.add('row-header', isPlayer ? 'align-right' : 'align-left');
                 } else if (i === size) {
-                    const charCode = isPlayer1 ? 65 + j - 1 : 65 + j;
-                    cell.textContent = String.fromCharCode(charCode);
+                    cell.textContent = String.fromCharCode(65 + colIdx);
                     cell.classList.add('column-header');
                 } else {
-                    const dataColumn = isPlayer1 ? j - 1 : j;
-
                     cell.setAttribute('data-row', i);
-                    cell.setAttribute('data-column', dataColumn);
+                    cell.setAttribute('data-column', colIdx);
 
                     cell.addEventListener('click', () => {
-                        events.emit('tileSelected', { owner, row: i, col: dataColumn });
+                        events.emit('tileSelected', { owner, row: i, col: colIdx });
                     });
 
-                    tempArr.push(cell);
+                    tiles[i][colIdx] = cell;
                 }
             }
-            tiles.push(tempArr);
         }
 
         board.appendChild(table);
@@ -175,10 +153,8 @@ const gameboardView = (owner, gameboard) => {
     function _createShipsDisplay(display) {
         for (let ship in shipList) {
             const container = document.createElement('div');
-            container.classList.add();
-            container.style.display = 'flex';
-            container.style.gap = '2px';
-            container.style.justifyContent = isPlayer1 ? 'flex-end' : 'flex-start';
+            container.classList.add('ship-display');
+            container.style.justifyContent = isPlayer ? 'flex-end' : 'flex-start';
 
             shipsDisplay[ship] = [];
 
@@ -187,7 +163,6 @@ const gameboardView = (owner, gameboard) => {
                 hp.classList.add('ship-hp');
 
                 container.appendChild(hp);
-
                 shipsDisplay[ship].push(hp);
             }
 
@@ -198,7 +173,7 @@ const gameboardView = (owner, gameboard) => {
     function _renderNewShip({ player, row, col }) {
         if (player === owner && owner != 'computer') {
             tiles[row][col].classList.add('ship');
-            removePreviewListeners();
+            _removePreviewListeners();
         }
     }
 
@@ -221,68 +196,68 @@ const gameboardView = (owner, gameboard) => {
         }
     }
 
-    function previewShipPlacement(shipClass) {
+    function _previewPlacement(shipClass) {
+        if (owner === 'computer') return;
+
         const newShip = ship(shipClass);
         let rotate = false;
 
         tiles.forEach((row, i) => {
-            let tempArr = [];
+            renderPreviewHandlers[i] = [];
             row.forEach((tile, j) => {
                 const wrapper = (e) => {
-                    previewCoords = renderPreview(i, j, newShip, rotate);
+                    previewCoords = _renderPreview(i, j, newShip, rotate);
                 };
                 tile.addEventListener('mouseover', wrapper);
-                tempArr.push(wrapper);
+                renderPreviewHandlers[i][j] = wrapper;
             });
-            renderPreviewHandlers.push(tempArr);
         });
 
         tiles.forEach((row, i) => {
-            let tempArr = [];
+            clearPreviewHandlers[i] = [];
             row.forEach((tile, j) => {
                 const wrapper = (e) => {
-                    if (previewCoords !== null) previewCoords.forEach(clearPreview);
+                    if (previewCoords !== null) previewCoords.forEach(_clearPreview);
                 };
                 tile.addEventListener('mouseout', wrapper);
-                tempArr.push(wrapper);
+                clearPreviewHandlers[i][j] = wrapper;
             });
-            clearPreviewHandlers.push(tempArr);
         });
 
         document.addEventListener('keydown', (e) => {
-            rotate = rotatePreview(e, rotate);
+            rotate = _rotatePreview(e, rotate);
         });
     }
 
-    function renderPreview(row, col, ship, rotate) {
+    function _renderPreview(row, col, ship, rotate) {
         const checkTiles = gameboard.checkPlacement(row, col, ship, rotate);
 
         if (checkTiles.valid) {
-            const targetTilesCoords = checkTiles.target.map((tile) => tile.getCoords());
+            const coords = checkTiles.target.map((tile) => tile.getCoords());
 
-            targetTilesCoords.forEach(({ row, col }) => {
+            coords.forEach(({ row, col }) => {
                 tiles[row][col].classList.add('preview');
             });
 
-            return targetTilesCoords;
+            return coords;
         } else {
             return null;
         }
     }
 
-    function clearPreview({ row, col }) {
+    function _clearPreview({ row, col }) {
         tiles[row][col].classList.remove('preview');
     }
 
-    function rotatePreview(e, rotate) {
+    function _rotatePreview(e, rotate) {
         if (e.key === 'Control') {
             events.emit('previewRotated', !rotate);
             return !rotate;
         }
     }
 
-    function removePreviewListeners() {
-        if (previewCoords !== null) previewCoords.forEach(clearPreview);
+    function _removePreviewListeners() {
+        if (previewCoords !== null) previewCoords.forEach(_clearPreview);
 
         if (renderPreviewHandlers.length !== 0) {
             tiles.forEach((row, i) => {
@@ -303,11 +278,6 @@ const gameboardView = (owner, gameboard) => {
         renderPreviewHandlers = [];
         clearPreviewHandlers = [];
     }
-
-    return {
-        previewShipPlacement,
-        getPlayerTiles,
-    };
 };
 
 const tile = (owner, row, col) => {

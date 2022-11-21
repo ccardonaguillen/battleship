@@ -85,7 +85,7 @@ const game = (function () {
         });
 
         function placeShip(ship) {
-            players.player.getBoardView().previewShipPlacement(ship);
+            events.emit('enablePreview', ship);
 
             return new Promise((resolve, reject) => {
                 const handler = function ({ owner, row, col }) {
