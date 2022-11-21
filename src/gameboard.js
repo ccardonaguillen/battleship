@@ -1,13 +1,6 @@
 import ship from './ship';
 import events from './events';
-
-const shipList = {
-    carrier: 5,
-    battleship: 4,
-    destroyer: 3,
-    submarine: 3,
-    patrol: 2,
-};
+import { shipList } from './ship';
 
 const gameboard = (owner, size = 10) => {
     const nrows = size;
