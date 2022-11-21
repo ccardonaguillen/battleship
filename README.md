@@ -9,6 +9,7 @@ DOM manipulation has been done separately.
 
 ## TODO
 
+-   Style CSS for a more polished look (now very minimalist)
 -   Implement AI for computer smart attacks (target tiles around attack hit and follow direction until ship is sunk)
 -   Log error in info-box when tile has already been selected. Previous attempt (promise-->reject) pass player's turn
 
