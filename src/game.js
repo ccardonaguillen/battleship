@@ -1,20 +1,15 @@
 import gameboard, { gameboardView } from './gameboard';
 import player from './player';
 import events from './events';
-import ship from './ship';
-
-const shipList = {
-    carrier: 5,
-    battleship: 4,
-    destroyer: 3,
-    submarine: 3,
-    patrol: 2,
-};
+import ship, { shipList } from './ship';
 
 const game = (function () {
     const infoBox = document.getElementById('info-box');
+    const resetButton = document.getElementById('new-game-button');
 
-    const players = { player: player(1), computer: player(2) };
+    let players = { player: player(1), computer: player(2) };
+
+    resetButton.addEventListener('click', resetGame);
 
     events.on('attackHit', _announceHit);
     events.on('attackMissed', _announceMiss);
@@ -29,12 +24,15 @@ const game = (function () {
 
     async function prepareBoard() {
         placeShipsRandomly(players.computer.getBoard());
+        // Await for ships to be placed
         await displayWelcomeMessage();
     }
 
     function displayWelcomeMessage() {
+        // Display initial message
         infoBox.innerHTML = `Place your ships <button id="manual-button">manually</button> or <button id="random-button">randomly</button>`;
 
+        // Resolve promise when player chooses to place ships manually or automatically
         return new Promise((resolve) => {
             const manualButton = document.getElementById('manual-button');
             manualButton.addEventListener('click', () => {
@@ -49,13 +47,8 @@ const game = (function () {
     }
 
     function placeShipsRandomly(gameboard) {
-        const availableShips = {
-            carrier: 5,
-            battleship: 4,
-            destroyer: 3,
-            submarine: 3,
-            patrol: 2,
-        };
+        // Generate random coords and direction and try to place ship until it succeeds
+        const availableShips = { ...shipList };
 
         function placeShip(ship) {
             const row = Math.floor(Math.random() * 10);
@@ -77,6 +70,7 @@ const game = (function () {
     }
 
     function placeShipsManually() {
+        // For each ship, enable preview and resolve promise when valid position is selected
         const gameboard = players.player.getBoard();
         let rotate = false;
 
@@ -95,7 +89,6 @@ const game = (function () {
 
                             events.off('tileSelected', handler);
                             rotate = false;
-
                             resolve();
                         } catch {
                             infoBox.textContent =
@@ -121,6 +114,9 @@ const game = (function () {
     }
 
     async function startGameLoop() {
+        // Run main loop, switching between the two player's turns
+        // Keep running until one of the players's ship have been destroyed
+        // Then announce winner
         infoBox.textContent = 'Select an enemy position to attack';
 
         events.on('shipSunk', ({ player, ship }) => {
@@ -132,9 +128,9 @@ const game = (function () {
         });
 
         while (Object.values(players).every((player) => player.getRemainingShips() !== 0)) {
-            await players.player
-                .playerAttack(players.computer)
-                .catch((message) => (infoBox.textContent = message));
+            await players.player.playerAttack(players.computer);
+            // TODO? : Log error message when selecting a previously selected tile while not passing turn
+            // reject('This tile has already been attacked. Select a new position');
             await new Promise((resolve) =>
                 setTimeout(() => {
                     players.computer.computerAttack(players.player).then(() => resolve());
@@ -157,6 +153,14 @@ const game = (function () {
     }
     function _announceSinking({ target, ship }) {
         infoBox.textContent = `${target}'s ${ship.getClass()} has been sunk`;
+    }
+
+    function resetGame() {
+        events.emit('gameReset', '');
+
+        Object.values(players).forEach((player) => player.reset());
+
+        startGame();
     }
 })();
 

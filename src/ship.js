@@ -11,6 +11,7 @@ const ship = (shipClass) => {
     let hp = length;
 
     function hit() {
+        // If ship has not been sunk, take 1 HP
         if (isSunk()) return;
 
         hp -= 1;
@@ -21,6 +22,7 @@ const ship = (shipClass) => {
     }
 
     function isSunk() {
+        // Return true if no HPs left
         return hp === 0 ? true : false;
     }
 
@@ -42,3 +44,4 @@ const ship = (shipClass) => {
 };
 
 export default ship;
+export { shipList };
