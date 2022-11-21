@@ -120,6 +120,14 @@ table td.preview {
     background-color: green;
 }
 
+table td.hit {
+    background-color: red;
+}
+
+table td.miss {
+    background-color: blue;
+}
+
 .row-header,
 .column-header,
 .corner-cell {
